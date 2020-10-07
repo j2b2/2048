@@ -27,7 +27,6 @@
     de l'affichage de `depth` dans `play!`, pour que la valeur
     visible soit bien celle du mouvement en cours
     * 30 août Révision et test des documentations des fonctions
-<<<<<<< HEAD
     * 26 septembre Ajout du champ `score` dans la structure `Game`,
     mis à jour par `move!` et utilisé par `computedepth`
     * 28 septembre, le score calculé par `staticeval`
@@ -36,8 +35,6 @@
     * 5 octobre, je découvre que `@time` utilise bêtement l'horloge,
     au lieu de retourner le temps CPU :-(
     * 6 octobre, `g.move` et `g.score` enregistrés dans l'historique
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 """
 module jb2048
 
@@ -46,17 +43,11 @@ const plt = PyPlot
 
 # used by dag2048.jl
 # export Board, Game, History, plot, record, slide, tileinsert!, back!
-<<<<<<< HEAD
 export Game, plot, initgame, initplot,
     play!, back!, force!, repartition,
     setcareful, setgamma
 
 # Plateau de jeu
-=======
-export Game, plot, initgame, play!, back!, force!, repartition
-
-"Board=puzzle"
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 const Board = Matrix{Int}
 
 plotcolor = ["white", "lightyellow", "orange", "orange",
@@ -73,28 +64,17 @@ function initplot(m = 4, n = 4, figwidth = 7, figheight = 5)
 end
 
 """
-<<<<<<< HEAD
     plot(b::Board [, newtile, depth, move, score])
-=======
-    plot(b::Board [, newtile, depth, move])
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
 Plot a board.
 
 * Optional argument `newtile` is the index of a tile
   to be singled out (green color).
-<<<<<<< HEAD
 * Optional arguments `depth`, `move`, (expected) `score`
   are displayed on figure's title.
 """
 function plot(b::Board, newtile=CartesianIndex(1,1),
      depth=0, move=0, score = 0)
-=======
-* Optional arguments `depth` and `move`
-  are displayed on figure's title.
-"""
-function plot(b::Board, newtile=CartesianIndex(1,1), depth=0, move=0)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     fs = 36 # font size
     m, n = size(b)
     plt.cla()
@@ -102,12 +82,8 @@ function plot(b::Board, newtile=CartesianIndex(1,1), depth=0, move=0)
     plt.xticks([])
     plt.yticks([])
     depth > 0 && plt.title("Depth $depth", loc="left")
-<<<<<<< HEAD
     move > 0 && plt.title("Move $move", loc="center")
     score > 0 && plt.title("Expected score $score", loc="right")
-=======
-    move > 0 && plt.title("Move $move", loc="right")
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     lp = length(plotcolor)
     for i in 1:m
         for j in 1:n
@@ -258,16 +234,10 @@ function setgamma(weights::Matrix{Float64})
     global gamma = weights
 end
 
-<<<<<<< HEAD
 # setgamma() = setgamma([16 12 8 4; 12 10 5 2; 8 5 3 1; 4 2 1 0.5])
 # setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 0; 8 3 0 0; 6 0 0 0])
 setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
-=======
-setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
-# setgamma() = setgamma([16 12 8 4; 12 10 5 2; 8 5 3 1; 4 2 1 0.5])
-# setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
 struct Estimation
     val::Float64
@@ -281,11 +251,7 @@ end
 
 # Much faster than setstatic() etc.
 # sq = squeeze, sw = score's weight
-<<<<<<< HEAD
 const sq, sw = 12, 2
-=======
-const sq, sw = 16, 2
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
 function updateworse(b::Board)
     sup = maximum(b)
@@ -329,10 +295,7 @@ function staticeval(b::Board)
                 val += sq * (1<<x - 1<<y)
             end
         end
-<<<<<<< HEAD
         # 0 < x < y && (val += sq * (1<<x - 1<<y))    # y squeezes x
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
         x = y
     end
     # first row
@@ -346,10 +309,7 @@ function staticeval(b::Board)
                 val += sq * (1<<x - 1<<y)
             end
         end
-<<<<<<< HEAD
         # 0 < x < y && (val += sq * (1<<x - 1<<y))    # y squeezes x
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
         x = y
     end
 
@@ -368,10 +328,6 @@ function staticeval(b::Board)
             x1 = y
         end
     end
-<<<<<<< HEAD
-=======
-    # val += emptycells(b)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     e = Estimation(val, score)
     ### cache
     misses_staticache += 1
@@ -419,7 +375,6 @@ of a new tile in `b`:
     when inserting the tile 2 (resp. 4).
 """
 function meaneval(b::Board, depth::Int)
-<<<<<<< HEAD
     if depth <= 0
         e = staticeval(b)
         return Estimation(e.val, 0)
@@ -427,12 +382,6 @@ function meaneval(b::Board, depth::Int)
     ### cache
     # It's a little faster to store only a key in the cache,
     # instead of (b,depth), and it's safe in this context
-=======
-    depth <= 0 && return staticeval(b)
-    ### cache
-    # It's a little faster to store only a key in the cache,
-    # instead of (b,depth,score), and it's safe in this context
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     global hits_meancache, misses_meancache
     key = hash((b,depth))
     e = get(meancache, key, Estimation(0.0, -1))
@@ -474,11 +423,8 @@ mutable struct History
     board::Vector{Board}
     newtile::Vector{CartesianIndex{2}}
     depth::Vector{Int}
-<<<<<<< HEAD
     move::Vector{Int}
     score::Vector{Int}  # expected
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
     function History(length)
         circular = 0
@@ -486,13 +432,9 @@ mutable struct History
         board = Vector{Board}(undef, length)
         newtile = Vector{CartesianIndex{2}}(undef, length)
         depth = Vector{Int}(undef, length)
-<<<<<<< HEAD
         move = Vector{Int}(undef, length)
         score = Vector{Int}(undef, length)
         new(length, circular, start, board, newtile, depth, move, score)
-=======
-        new(length, circular, start, board, newtile, depth)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     end
 end
 
@@ -501,12 +443,8 @@ function Base.show(io::IO, h::History)
     print(io, "Circular history: start $(h.start) -> current $(h.circular), length $(h.length)")
 end
 
-<<<<<<< HEAD
 function record(h::History, b::Board,
     t::CartesianIndex{2}, d::Int, m::Int, sc::Int)
-=======
-function record(h::History, b::Board, t::CartesianIndex{2}, d::Int)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     # first values of (start,circular) for length 128, phase 1:
     #  (1,0) -> (1,1) -> (1,2) -> (1,3) ... -> (1,127) -> (1,128)
     # now buffer is full, transition to phase 2 occurs: (1,128) -> (2,1)
@@ -523,21 +461,13 @@ function record(h::History, b::Board, t::CartesianIndex{2}, d::Int)
     end
     i = h.circular
     h.board[i] = copy(b)
-<<<<<<< HEAD
     h.newtile[i], h.depth[i], h.move[i], h.score[i] = t, d, m, sc
-=======
-    h.newtile[i], h.depth[i] = t, d
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 end
 
 function Base.getindex(h::History, i::Int)
     n = lastindex(h)
     i = mod(h.start + i - 2, n) + 1
-<<<<<<< HEAD
     h.board[i], h.newtile[i], h.depth[i], h.move[i], h.score[i]
-=======
-    h.board[i], h.newtile[i], h.depth[i]
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 end
 
 function Base.lastindex(h::History)
@@ -545,20 +475,13 @@ function Base.lastindex(h::History)
 end
 
 """
-<<<<<<< HEAD
 A game `g` has seven fields:
-=======
-A game `g` has six fields:
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
   * `board`, a matrix that records game's tiles
   * `newtile`, an index that records the last tile
     inserted by `tileinsert!()`
   * `depth`, the recursive depth computed before a move
   * `move`, number of moves
-<<<<<<< HEAD
   * `score`, sum of expected mergings for the next `depth` moves
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
   * `motion`, expanded information about moves (directions)
   * `hist`, a circular buffer that stores a (partial) game's history
 """
@@ -567,27 +490,16 @@ mutable struct Game
     newtile::CartesianIndex{2}
     depth::Int
     move::Int
-<<<<<<< HEAD
     score::Int  # expected
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     motion::Vector{Int}
     hist::History
 
     function Game(board)
-<<<<<<< HEAD
         new(board, CartesianIndex(1, 1), 0, 0, 0, zeros(Int, 4), History(128))
     end
 end
 
 record(g::Game) = record(g.hist, g.board, g.newtile, g.depth, g.move, g.score)
-=======
-        new(board, CartesianIndex(1, 1), 0, 0, zeros(Int, 4), History(128))
-    end
-end
-
-record(g::Game) = record(g.hist, g.board, g.newtile, g.depth)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
 function Base.show(io::IO, g::Game)
     print(io, "Game ", g.board, ", move ", g.move)
@@ -601,17 +513,10 @@ Base.lastindex(g::Game) = Base.lastindex(g.board)
     plot(g::Game)
 
 Shortcut for plotting `g.board`, with `g.newtile` singled out,
-<<<<<<< HEAD
 and `g.depth`, `g.move`, (expected) `g.score` displayed as title
 """
 function plot(g::Game)
     plot(g.board, g.newtile, g.depth, g.move, g.score)
-=======
-and `g.depth`, `g.move` displayed as title
-"""
-function plot(g::Game)
-    plot(g.board, g.newtile, g.depth, g.move)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 end
 
 """
@@ -631,7 +536,6 @@ function initgame()
 end
 
 """
-<<<<<<< HEAD
     setcareful(d::Tuple{Int, Int, Int, Int})
 
 Set a tuple of four parameters for computation of the recursive depth:
@@ -648,28 +552,12 @@ setcareful(initd::Int, maxd::Int, large::Int, score::Int) =
     setcareful((initd, maxd, large, score))
 
 setcareful() = setcareful(4, 7, 3, 128)
-=======
-    setcareful(d::Tuple{Int, Int})
-
-Set couple of parameters for computation of the recursive depth:
-  * initial depth
-  * number of large tiles that triggers depth's incrementation
-"""
-function setcareful(d::Tuple{Int, Int})
-    global careful = d
-end
-
-setcareful(a::Int, b::Int) = setcareful((a, b))
-
-setcareful() = setcareful(3, 3)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
 
 """
     computedepth(b::Board)
 
 Compute recursive evaluation's depth, initially first
 careful's value, and then incremented it the number of
-<<<<<<< HEAD
 large tiles (large = 128 and above)
 is greater than third careful's value.
 No incrementation if there are tiles to be merged soon.
@@ -683,27 +571,6 @@ function computedepth(g::Game)
         c = count(b .> 6)
         c > large && (depth += c - large)
         depth = min(depth, maxd)
-=======
-large tiles is greater than second careful's value.
-No incrementation if there are tiles to be merged quickly.
-"""
-function computedepth(b::Board)
-    initd, quiet = careful
-    depth = initd
-    updateworse(b)
-    # les choix ci-dessous accélèrent de plus en plus les calculs
-    # au prix d'une diminution de la longueur moyenne des parties
-    # (profondeur d'exploration insuffisante)
-        # e = staticeval(b)
-        # e = maxeval(b, 1)
-        # e = maxeval(b, 2)
-        # e = maxeval(b, initd)
-    e = staticeval(b)
-    if e.score < 64
-        large = count(b .> 6)
-        large > quiet && (depth += large - quiet)
-        depth > 6 && (depth = 6)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     end
     depth
 end
@@ -718,15 +585,10 @@ otherwise `g.board` and `g.move` are updated.
 Return `bestdir`.
 """
 function move!(g::Game, depth::Int)
-<<<<<<< HEAD
     if g.score > careful[4] # ménage sur le plateau et dans la mémoire
         empty!(staticache)
         empty!(meancache)
     end
-=======
-    empty!(staticache)
-    empty!(meancache)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     b = g.board
     updateworse(b)
     ### compute best move
@@ -747,10 +609,7 @@ function move!(g::Game, depth::Int)
                 bestdir = dir
                 # newboard = copy(bs)
                 newboard = bs
-<<<<<<< HEAD
                 g.score = score
-=======
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
             end
         end
     end
@@ -759,10 +618,6 @@ function move!(g::Game, depth::Int)
         g.board = newboard
         g.move += 1
         g.motion[bestdir] += 1
-<<<<<<< HEAD
-=======
-        # g.motion[5] += count(g.board .== 0)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     end
     bestdir
 end
@@ -772,7 +627,6 @@ end
 
 Play a game, with current state of `g` as starting point.
 
-<<<<<<< HEAD
   * If keyword argument `display` is `true` (default is `false`),
     `g` is plotted after each move.
   * The number of moves may be bounded by the optional keyword
@@ -784,20 +638,6 @@ Play a game, with current state of `g` as starting point.
 """
 function play!(g::Game;
     display::Bool=false, moves::Int=32768, target::Tuple{Int,Int}=(16,1))
-=======
-* If keyword argument `display` is `true` (default is `false`),
-  `g` is plotted after each move.
-* The number of moves may be bounded by the optional keyword
-  argument `moves`, thereafter the game stops
-  -- and may be resumed by issuing again `play!(g)`.
-* Optional keyword argument `target` is a couple `(t,p)`
-  that stops the game as soon as the tile `t` appears
-  in position `p`.
-"""
-function play!(g::Game;
-    display::Bool=false, moves::Int=32768, target::Tuple{Int,Int}=(16,1))
-    global gamma
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     global hits_meancache, misses_meancache
     global hits_staticeval, misses_staticeval
     n = g.move
@@ -805,11 +645,7 @@ function play!(g::Game;
         hits_meancache = misses_meancache = 0
         hits_staticeval = misses_staticeval = 0
         g.hist = History(128)
-<<<<<<< HEAD
         record(g.hist, g.board, CartesianIndex(1,1), 0, 0)
-=======
-        record(g.hist, g.board, CartesianIndex(1,1), 0)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     end
     t, p = target   # target value, position
     while g.move < n + moves
@@ -820,11 +656,7 @@ function play!(g::Game;
                 large >= p - 1 && break
             end
         end
-<<<<<<< HEAD
         d = computedepth(g)
-=======
-        d = computedepth(g.board)
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
         if d != g.depth
             if display
                 plt.title("Depth $d", loc="left", color="blue")
@@ -923,16 +755,9 @@ Optional keyword arguments :
     in position `p`.
 """
 function repartition(n; game = nothing, verbose = true, target = (16, 1))
-<<<<<<< HEAD
     println("gamma = $gamma")
     print("careful = $careful ")
     println("sq, sw = $sq, $sw")
-=======
-    # verbose && println("gamma = $gamma")
-    # verbose && println("careful = $careful static = $static")
-    verbose && print("careful = $careful ")
-    verbose && println("sq, sw = $sq, $sw")
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
     hsup = zeros(Int, 16)
     nmoves = 0
     hgames = Vector{Game}(undef, n)
@@ -946,7 +771,6 @@ function repartition(n; game = nothing, verbose = true, target = (16, 1))
         hmoves = div(nmoves,i)
         if verbose
             println("$i: $g")
-<<<<<<< HEAD
             b = length(g.board)
             if b == 16
                 a, b = 10, 15
@@ -954,9 +778,6 @@ function repartition(n; game = nothing, verbose = true, target = (16, 1))
                 a, b = b - 4, b + 1
             end
             println("$hmoves $(hsup[a:b])")
-=======
-            println("$hmoves $(hsup[10:15])")
->>>>>>> bfa6d8d16633648c7d9b612c6b5d21074dd0b7c5
         end
         hgames[i] = g
     end
