@@ -294,7 +294,7 @@ function staticeval(b::Board)
     global hits_staticache, misses_staticache
     key = hash(b)
     e = get(staticache, key, sadestim)
-    e == sadestim || (hits_staticache += 1; return e)
+    e.score < 0 || (hits_staticache += 1; return e)
     ### end cache
 
     val = sum(1<<b[i] * gamma[i] for i in LinearIndices(b))
@@ -384,7 +384,7 @@ function meaneval(b::Board, depth::Int)
     global hits_meancache, misses_meancache
     key = hash((b,depth))
     e = get(meancache, key, sadestim)
-    e == sadestim || (hits_meancache += 1; return e)
+    e.score < 0 || (hits_meancache += 1; return e)
     ## end cache
 
     fc = findall(b .== 0)  # indices of free cells
