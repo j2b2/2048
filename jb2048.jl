@@ -35,6 +35,17 @@
     * 5 octobre, je découvre que `@time` utilise bêtement l'horloge,
     au lieu de retourner le temps CPU :-(
     * 6 octobre, `g.move` et `g.score` enregistrés dans l'historique
+    * 9 octobre, fonction `meaneval()` accélérée :
+    lorsque la profondeur de recherche `depth` est grande
+    (supérieure à 5), elle est décrémentée si le nombre de cellules
+    vides est supérieur à 2.
+    * 10 octobre, `staticeval()` remaniée, la dernière ligne
+    et la denière colonne ne sont plus ordonnées,
+    ce sont de simples "réserves" ("stores"),
+    dont les cellules n'ont plus de poids
+    (`gamma` vaut 0 sur cette ligne et cette colonne extrêmes).
+    * 13 octobre, fonction `update_worse()` supprimée au profit
+    de la constante `sadestim`
 """
 module jb2048
 
@@ -237,14 +248,20 @@ end
 # setgamma() = setgamma([16 12 8 4; 12 10 5 2; 8 5 3 1; 4 2 1 0.5])
 # setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 0; 8 3 0 0; 6 0 0 0])
-setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
+# setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
+setgamma() = setgamma([16.0 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
 
 struct Estimation
     val::Float64
     score::Int
 end
 
+# simpler word than worse_estim :-)
+const sadestim = Estimation(0.0, -1)
+
 function Base.:<(e1::Estimation, e2::Estimation)
+    e2.score < 0 && return false
+    e1.score < 0 && return true
     # sw = score's weight
     e1.val + sw * e1.score < e2.val + sw * e2.score
 end
@@ -253,10 +270,10 @@ end
 # sq = squeeze, sw = score's weight
 const sq, sw = 12, 2
 
-function updateworse(b::Board)
-    sup = maximum(b)
-    global worse_eval = -(1 << sup) * gamma[1]
-end
+# function updateworse(b::Board)
+#     sup = maximum(b)
+#     global worse_eval = -(1 << sup) * gamma[1]
+# end
 
 staticache = Dict{UInt64,Estimation}()
 hits_staticache = misses_staticache = 0
@@ -276,56 +293,38 @@ function staticeval(b::Board)
     ### instead of the matrix b, and it's safe in this context
     global hits_staticache, misses_staticache
     key = hash(b)
-    e = get(staticache, key, Estimation(0.0, -1))
-    e.score == -1 || (hits_staticache += 1; return e)
+    e = get(staticache, key, sadestim)
+    e == sadestim || (hits_staticache += 1; return e)
     ### end cache
 
     val = sum(1<<b[i] * gamma[i] for i in LinearIndices(b))
     score = 0
     m, n = size(b)
-    x = b[1]
-    # first column
-    # sq = squeeze
-    for i in 2:m
-        @inbounds y = b[i, 1]
-        if y > 0
-            if x == y
-                score += 2<<y
-            elseif 0 < x < y    # y squeezes x
-                val += sq * (1<<x - 1<<y)
-            end
-        end
-        # 0 < x < y && (val += sq * (1<<x - 1<<y))    # y squeezes x
-        x = y
-    end
-    # first row
-    x = b[1]
-    for j in 2:n
-        @inbounds y = b[1, j]
-        if y > 0
-            if x == y
-                score += 2<<y
-            elseif 0 < x < y    # y squeezes x
-                val += sq * (1<<x - 1<<y)
-            end
-        end
-        # 0 < x < y && (val += sq * (1<<x - 1<<y))    # y squeezes x
-        x = y
-    end
 
-    # inner tiles
-    for j in 2:n
+    # rows, last one is a simple store
+    for i in 1:m-1
         # @inbounds efficace (test)
-        @inbounds x1 = b[1, j]
+        @inbounds x = b[i, 1]
+        for j in 2:n
+            @inbounds y = b[i, j]
+            if y > 0
+                x == y && (score += 2<<y)
+                0 < x < y && (val += sq * (1<<x - 1<<y))
+            end
+            x = y
+        end
+    end
+    # columns, last one is a simple store
+    for j in 1:n-1
+        # @inbounds efficace (test)
+        @inbounds x = b[1, j]
         for i in 2:m
             @inbounds y = b[i, j]
             if y > 0
-                @inbounds x2 = b[i, j - 1]
-                (x1 == y || x2 == y) && (score += 2<<y)
-                0 < x1 < y && (val += sq * (1<<x1 - 1<<y))
-                0 < x2 < y && (val += sq * (1<<x2 - 1<<y))
+                x == y && (score += 2<<y)
+                0 < x < y && (val += sq * (1<<x - 1<<y))
             end
-            x1 = y
+            x = y
         end
     end
     e = Estimation(val, score)
@@ -343,7 +342,7 @@ Return the recursive estimation of the best move
 (via calls to `meaneval`), up to the required depth.
 """
 function maxeval(b::Board, depth::Int)
-    bestestim = Estimation(worse_eval, 0)
+    bestestim = sadestim
     for dir = 1:4
         bs, sc, moved = slide(b, dir)
         if moved
@@ -384,14 +383,16 @@ function meaneval(b::Board, depth::Int)
     # instead of (b,depth), and it's safe in this context
     global hits_meancache, misses_meancache
     key = hash((b,depth))
-    e = get(meancache, key, Estimation(0.0, -1))
-    e.score == -1 || (hits_meancache += 1; return e)
+    e = get(meancache, key, sadestim)
+    e == sadestim || (hits_meancache += 1; return e)
     ## end cache
 
     fc = findall(b .== 0)  # indices of free cells
     nf = length(fc)
     if nf == 0
-        return Estimation(worse_eval, 0)
+        return sadestim
+    elseif nf > 2 && depth > 5
+        depth -= 1
     end
     val = 0.0
     score = 0.0
@@ -502,7 +503,7 @@ end
 record(g::Game) = record(g.hist, g.board, g.newtile, g.depth, g.move, g.score)
 
 function Base.show(io::IO, g::Game)
-    print(io, "Game ", g.board, ", move ", g.move)
+    print(io, "Game $(g.board) move $(g.move) depth $(g.depth) $(g.newtile)")
 end
 
 Base.getindex(g::Game, i...) = g.board[i...]
@@ -566,7 +567,7 @@ function computedepth(g::Game)
     initd, maxd, large, score = careful
     depth = initd
     b = g.board
-    updateworse(b)
+    # updateworse(b)
     if g.score < score
         c = count(b .> 6)
         c > large && (depth += c - large)
@@ -590,9 +591,9 @@ function move!(g::Game, depth::Int)
         empty!(meancache)
     end
     b = g.board
-    updateworse(b)
+    # updateworse(b)
     ### compute best move
-    bestestim = Estimation(worse_eval, 0)
+    bestestim = sadestim
     bestdir = 0
     local newboard::Board
     for dir = 1:4
