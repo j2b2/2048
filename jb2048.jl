@@ -92,8 +92,8 @@ function plot(b::Board, newtile=CartesianIndex(1,1),
     plt.axis([0.5, n + 0.5, 0.5, m + 0.5])
     plt.xticks([])
     plt.yticks([])
-    depth > 0 && plt.title("Depth $depth", loc="left")
-    move > 0 && plt.title("Move $move", loc="center")
+    move > 0 && plt.title("Move $move", loc="left")
+    depth > 0 && plt.title("Depth $depth", loc="center")
     score > 0 && plt.title("Expected score $score", loc="right")
     lp = length(plotcolor)
     for i in 1:m
@@ -567,7 +567,6 @@ function computedepth(g::Game)
     initd, maxd, large, score = careful
     depth = initd
     b = g.board
-    # updateworse(b)
     if g.score < score
         c = count(b .> 6)
         c > large && (depth += c - large)
@@ -660,7 +659,7 @@ function play!(g::Game;
         d = computedepth(g)
         if d != g.depth
             if display
-                plt.title("Depth $d", loc="left", color="blue")
+                plt.title("Depth $d", loc="center", color="blue")
                 # nécessaire pour affichage en temps réel :
                 plt.pause(0.01)
             end
