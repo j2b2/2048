@@ -46,6 +46,9 @@
     (`gamma` vaut 0 sur cette ligne et cette colonne extrêmes).
     * 13 octobre, fonction `update_worse()` supprimée au profit
     de la constante `sadestim`
+    * 5 novembre, la fonction `setcareful()` est simplifiée;
+    introduction des constantes `nfz` et `dfz` pour l'accélération
+    de la fonction `meaneval()`
 """
 module jb2048
 
@@ -55,7 +58,7 @@ const plt = PyPlot
 # used by dag2048.jl
 # export Board, Game, History, plot, record, slide, tileinsert!, back!
 export Game, plot, initgame, initplot,
-    play!, back!, force!, repartition,
+    play!, back!, force!, xplay!, repartition,
     setcareful, setgamma
 
 # Plateau de jeu
@@ -361,6 +364,9 @@ end
 meancache = Dict{UInt64, Estimation}()
 hits_meancache = misses_meancache = 0
 
+# fz = free zone
+const nfz, dfz = 3, 5
+
 """
     meaneval(b::Board, depth::Int)
 
@@ -389,11 +395,8 @@ function meaneval(b::Board, depth::Int)
 
     fc = findall(b .== 0)  # indices of free cells
     nf = length(fc)
-    if nf == 0
-        return sadestim
-    elseif nf > 2 && depth > 5
-        depth -= 1
-    end
+    nf == 0 && return sadestim
+    nf > nfz && depth > dfz && (depth -= 1)
     val = 0.0
     score = 0.0
     for i in fc
@@ -537,39 +540,40 @@ function initgame()
 end
 
 """
-    setcareful(d::Tuple{Int, Int, Int, Int})
+    setcareful(d::Tuple{Int, Int, Int})
 
-Set a tuple of four parameters for computation of the recursive depth:
+Set a tuple of three parameters for computation of the recursive depth:
   * initial depth
   * maximal depth
-  * number of large tiles that triggers depth's incrementation
-  * minimal expected score that prevents depth's incrementation
+  * corner size , ie. number of large tiles that triggers depth's incrementation
 """
-function setcareful(d::Tuple{Int, Int, Int, Int})
+function setcareful(d::Tuple{Int, Int, Int})
     global careful = d
 end
 
-setcareful(initd::Int, maxd::Int, large::Int, score::Int) =
-    setcareful((initd, maxd, large, score))
+setcareful(initd::Int, maxd::Int, cornersize::Int) =
+    setcareful((initd, maxd, cornersize))
 
-setcareful() = setcareful(4, 7, 3, 128)
+setcareful() = setcareful(4, 7, 3)
 
 """
     computedepth(b::Board)
 
-Compute recursive evaluation's depth, initially first
-careful's value, and then incremented it the number of
-large tiles (large = 128 and above)
-is greater than third careful's value.
-No incrementation if there are tiles to be merged soon.
+Compute recursive evaluation's depth, using parameter
+`careful` = `(initd, maxd, cornersize)`
+  * initially depth = `initd`
+  * depth is incremented if the number of
+    large tiles (f and above) is greater than `cornersize`
+  * depth is never greater than `maxd`
+  * no incrementation if the expected score is greater than 128
 """
 function computedepth(g::Game)
-    initd, maxd, large, score = careful
+    initd, maxd, cornersize = careful
     depth = initd
     b = g.board
-    if g.score < score
-        c = count(b .> 6)
-        c > large && (depth += c - large)
+    c = count(b .> 6)
+    if g.score < 128
+        c > cornersize && (depth += c - cornersize)
         depth = min(depth, maxd)
     end
     depth
@@ -585,7 +589,7 @@ otherwise `g.board` and `g.move` are updated.
 Return `bestdir`.
 """
 function move!(g::Game, depth::Int)
-    if g.score > careful[4] # ménage sur le plateau et dans la mémoire
+    if g.score >= 128 # ménage sur le plateau et dans la mémoire
         empty!(staticache)
         empty!(meancache)
     end
@@ -712,6 +716,28 @@ function force!(g::Game, dir::Int)
 end
 
 """
+    xplay!(g::Game, n::Int)
+
+Sequence of plays, alternating quick progressions and
+careful ones. The sequence stops as soon as
+the tile `14` (i.e. `2^14=16384`) -- resp. `13, 12` --
+appears in position `n`.
+If `n>3`, `xplay! = play!`.
+"""
+
+function xplay!(g::Game, n::Int; options...)
+    n > 3 && return play!(g; options...)
+    for p in n:4
+        setcareful(3, 7, 3)
+        play!(g, target = (9, 4); options...)
+        setcareful(5, 8, 4)
+        t = p < 4 ? (14 - p, p) : (15 - n, n)
+        println("target $t")
+        play!(g, target = t; options...)
+    end
+end
+
+"""
     evals(b::Board, depth)
 
 Return a matrix `u`, where `u[i,j]` is the evaluation of move `i`
@@ -758,6 +784,7 @@ function repartition(n; game = nothing, verbose = true, target = (16, 1))
     println("gamma = $gamma")
     print("careful = $careful ")
     println("sq, sw = $sq, $sw")
+    println("meaneval nfz, dfz = $nfz, $dfz")
     hsup = zeros(Int, 16)
     nmoves = 0
     hgames = Vector{Game}(undef, n)
