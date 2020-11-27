@@ -244,7 +244,7 @@ function tslide(b::Board, direction:: Int)
     end
 end
 
-function setgamma(weights::Matrix{Float64})
+function setgamma(weights::Matrix{Int})
     global gamma = weights
 end
 
@@ -252,15 +252,15 @@ end
 # setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 0; 8 3 0 0; 6 0 0 0])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
-setgamma() = setgamma([16.0 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
+setgamma() = setgamma([16 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
 
 struct Estimation
-    val::Float64
+    val::Int
     score::Int
 end
 
 # simpler word than worse_estim :-)
-const sadestim = Estimation(0.0, -1)
+const sadestim = Estimation(0, -1)
 
 function Base.:<(e1::Estimation, e2::Estimation)
     e2.score < 0 && return false
@@ -397,8 +397,8 @@ function meaneval(b::Board, depth::Int)
     nf = length(fc)
     nf == 0 && return sadestim
     nf > nfz && depth > dfz && (depth -= 1)
-    val = 0.0
-    score = 0.0
+    val::Float64 = 0.0
+    score::Float64 = 0.0
     for i in fc
         b[i] = 1
         e = maxeval(b, depth)
@@ -410,9 +410,9 @@ function meaneval(b::Board, depth::Int)
         score += 0.1 * e.score
         b[i] = 0
     end
-    val = val / nf
-    score = round(score / nf)
-    e = Estimation(val, score)
+    v = round(Int, val / nf)
+    s = round(Int, score / nf)
+    e = Estimation(v, s)
     ### cache
     misses_meancache += 1
     meancache[key] = e
@@ -716,19 +716,21 @@ function force!(g::Game, dir::Int)
 end
 
 """
-    xplay!(g::Game, n::Int)
+    xplay!(g::Game, n::Int; options...)
 
 Sequence of plays, alternating quick progressions and
 careful ones. The sequence stops as soon as
 the tile `14` (i.e. `2^14=16384`) -- resp. `13, 12` --
 appears in position `n`.
 If `n>3`, `xplay! = play!`.
-"""
 
+Optional keywords are those of the `play!` function.
+"""
 function xplay!(g::Game, n::Int; options...)
     n > 3 && return play!(g; options...)
     for p in n:4
         setcareful(3, 7, 3)
+        println("quick play")
         play!(g, target = (9, 4); options...)
         setcareful(5, 8, 4)
         t = p < 4 ? (14 - p, p) : (15 - n, n)
@@ -752,7 +754,7 @@ function evals(b::Board, depth::Int)
         if moved
             for k = 1:depth
                 e = meaneval(bs, k)
-                u[dir,k] = e
+                u[dir, k] = e
             end
         end
     end
