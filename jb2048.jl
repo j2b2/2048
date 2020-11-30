@@ -49,7 +49,18 @@
     * 5 novembre, la fonction `setcareful()` est simplifiée;
     introduction des constantes `nfz` et `dfz` pour l'accélération
     de la fonction `meaneval()`
+    * 26 novembre, les évaluations et la matrice `gamma` ne sont plus
+    des flottants; voir en particulier la modification de la fonction
+    `meaneval()`
+    * 27 novembre, annulation de la modification du 28 septembre,
+    qui semble erronée
+    * 28 novembre, introduction de `struct Configuration`,
+    de telle sorte qu'une `History` contienne un vecteur de configurations.
+    Duplication de code inévitable avec `struct Game`, pour conserver
+    dans les deux cas un accès direct aux champs `board`, `move`, etc.
+    * 30 novembre, la fonction `plot` utilise la structure `Configuration`.
 """
+
 module jb2048
 
 import PyPlot
@@ -57,7 +68,7 @@ const plt = PyPlot
 
 # used by dag2048.jl
 # export Board, Game, History, plot, record, slide, tileinsert!, back!
-export Game, plot, initgame, initplot,
+export Game, Configuration, plot, initgame, initplot,
     play!, back!, force!, xplay!, repartition,
     setcareful, setgamma
 
@@ -78,26 +89,18 @@ function initplot(m = 4, n = 4, figwidth = 7, figheight = 5)
 end
 
 """
-    plot(b::Board [, newtile, depth, move, score])
+    plot(b::Board [, newtile])
 
-Plot a board.
-
-* Optional argument `newtile` is the index of a tile
-  to be singled out (green color).
-* Optional arguments `depth`, `move`, (expected) `score`
-  are displayed on figure's title.
+Plot a board. Optional argument `newtile` is the index of a tile
+to be singled out (green color).
 """
-function plot(b::Board, newtile=CartesianIndex(1,1),
-     depth=0, move=0, score = 0)
+function plot(b::Board, newtile=CartesianIndex(1,1))
     fs = 36 # font size
     m, n = size(b)
     plt.cla()
     plt.axis([0.5, n + 0.5, 0.5, m + 0.5])
     plt.xticks([])
     plt.yticks([])
-    move > 0 && plt.title("Move $move", loc="left")
-    depth > 0 && plt.title("Depth $depth", loc="center")
-    score > 0 && plt.title("Expected score $score", loc="right")
     lp = length(plotcolor)
     for i in 1:m
         for j in 1:n
@@ -117,7 +120,7 @@ function plot(b::Board, newtile=CartesianIndex(1,1),
         end
     end
     plt.draw()
-    plt.pause(0.01) # nécessaire, sinon rien n'est affiché
+    # plt.pause(0.01) # nécessaire, sinon rien n'est affiché
 end
 
 """
@@ -380,10 +383,11 @@ of a new tile in `b`:
     when inserting the tile 2 (resp. 4).
 """
 function meaneval(b::Board, depth::Int)
-    if depth <= 0
-        e = staticeval(b)
-        return Estimation(e.val, 0)
-    end
+    # if depth <= 0
+    #     e = staticeval(b)
+    #     return Estimation(e.val, 0)
+    # end
+    depth <= 0 && return staticeval(b)
     ### cache
     # It's a little faster to store only a key in the cache,
     # instead of (b,depth), and it's safe in this context
@@ -420,25 +424,41 @@ function meaneval(b::Board, depth::Int)
     return e
 end
 
+# Duplication de code avec la structure Game
+# ne pas modifier l'un sans l'autre
+struct Configuration
+    board::Board
+    newtile::CartesianIndex{2}
+    move::Int
+    depth::Int
+    score::Int  # expected
+end
+
+"""
+    plot(c::Configuration)
+
+Plot `c.board`, with `g.newtile` singled out,
+and `c.depth`, `c.move`, (expected) `c.score` displayed as title.
+"""
+function plot(c::Configuration)
+    plot(c.board, c.newtile)
+    plt.title("Move $(c.move)", loc="left")
+    plt.title("Depth $(c.depth)", loc="center")
+    plt.title("Expected score $(c.score)", loc="right")
+    plt.pause(0.01) # nécessaire, sinon rien n'est affiché
+end
+
 mutable struct History
     length::Int
     circular::Int
     start::Int
-    board::Vector{Board}
-    newtile::Vector{CartesianIndex{2}}
-    depth::Vector{Int}
-    move::Vector{Int}
-    score::Vector{Int}  # expected
+    config::Vector{Configuration}
 
     function History(length)
         circular = 0
         start = 1
-        board = Vector{Board}(undef, length)
-        newtile = Vector{CartesianIndex{2}}(undef, length)
-        depth = Vector{Int}(undef, length)
-        move = Vector{Int}(undef, length)
-        score = Vector{Int}(undef, length)
-        new(length, circular, start, board, newtile, depth, move, score)
+        c = Vector{Configuration}(undef, length)
+        new(length, circular, start, c)
     end
 end
 
@@ -447,8 +467,7 @@ function Base.show(io::IO, h::History)
     print(io, "Circular history: start $(h.start) -> current $(h.circular), length $(h.length)")
 end
 
-function record(h::History, b::Board,
-    t::CartesianIndex{2}, d::Int, m::Int, sc::Int)
+function record(h::History, c::Configuration)
     # first values of (start,circular) for length 128, phase 1:
     #  (1,0) -> (1,1) -> (1,2) -> (1,3) ... -> (1,127) -> (1,128)
     # now buffer is full, transition to phase 2 occurs: (1,128) -> (2,1)
@@ -464,14 +483,13 @@ function record(h::History, b::Board,
         h.start > h.length && (h.start = 1)
     end
     i = h.circular
-    h.board[i] = copy(b)
-    h.newtile[i], h.depth[i], h.move[i], h.score[i] = t, d, m, sc
+    h.config[i] = c
 end
 
 function Base.getindex(h::History, i::Int)
     n = lastindex(h)
     i = mod(h.start + i - 2, n) + 1
-    h.board[i], h.newtile[i], h.depth[i], h.move[i], h.score[i]
+    h.config[i]
 end
 
 function Base.lastindex(h::History)
@@ -482,18 +500,20 @@ end
 A game `g` has seven fields:
   * `board`, a matrix that records game's tiles
   * `newtile`, an index that records the last tile
-    inserted by `tileinsert!()`
-  * `depth`, the recursive depth computed before a move
+  inserted by `tileinsert!()`
   * `move`, number of moves
+  * `depth`, the recursive depth computed before a move
   * `score`, sum of expected mergings for the next `depth` moves
   * `motion`, expanded information about moves (directions)
   * `hist`, a circular buffer that stores a (partial) game's history
 """
 mutable struct Game
+    # Duplication de code avec la structure Configuration
+    # ne pas modifier l'une sans l'autre
     board::Board
     newtile::CartesianIndex{2}
-    depth::Int
     move::Int
+    depth::Int
     score::Int  # expected
     motion::Vector{Int}
     hist::History
@@ -503,24 +523,20 @@ mutable struct Game
     end
 end
 
-record(g::Game) = record(g.hist, g.board, g.newtile, g.depth, g.move, g.score)
+record(g::Game) = record(g.hist,
+    Configuration(g.board, g.newtile, g.move, g.depth, g.score))
 
 function Base.show(io::IO, g::Game)
-    print(io, "Game $(g.board) move $(g.move) depth $(g.depth) $(g.newtile)")
+    print(io, "Game $(g.board) $(g.newtile) move $(g.move) depth $(g.depth)")
 end
 
 Base.getindex(g::Game, i...) = g.board[i...]
 Base.setindex!(g::Game, x, i...) = Base.setindex!(g.board, x, i...)
 Base.lastindex(g::Game) = Base.lastindex(g.board)
 
-"""
-    plot(g::Game)
-
-Shortcut for plotting `g.board`, with `g.newtile` singled out,
-and `g.depth`, `g.move`, (expected) `g.score` displayed as title
-"""
 function plot(g::Game)
-    plot(g.board, g.newtile, g.depth, g.move, g.score)
+    c = Configuration(g.board, g.newtile, g.move, g.depth, g.score)
+    plot(c)
 end
 
 """
@@ -554,7 +570,7 @@ end
 setcareful(initd::Int, maxd::Int, cornersize::Int) =
     setcareful((initd, maxd, cornersize))
 
-setcareful() = setcareful(4, 7, 3)
+setcareful() = setcareful(4, 7, 4)
 
 """
     computedepth(b::Board)
@@ -645,12 +661,12 @@ function play!(g::Game;
     global hits_meancache, misses_meancache
     global hits_staticeval, misses_staticeval
     n = g.move
-    if n < 2
-        hits_meancache = misses_meancache = 0
-        hits_staticeval = misses_staticeval = 0
-        g.hist = History(128)
-        record(g.hist, g.board, CartesianIndex(1,1), 0, 0)
-    end
+    # if n < 2
+    #     hits_meancache = misses_meancache = 0
+    #     hits_staticeval = misses_staticeval = 0
+    #     g.hist = History(128)
+    #     record(g.hist, g.board, CartesianIndex(1,1), 0, 0)
+    # end
     t, p = target   # target value, position
     while g.move < n + moves
         if t < 16   # otherwise target unreachable
@@ -693,9 +709,10 @@ The integer `i` is an index in the circular buffer `g.hist` :
 Caution: `g.hist` is not updated.
 """
 function back!(g::Game, i)
-    g.board, g.newtile = g.hist[i][1:2]
-    n = lastindex(g.hist)
-    g.move += mod1(i, n) - n
+    c = g.hist[i]
+    g.board = c.board
+    g.newtile = c.newtile
+    g.move = c.move
 end
 
 """
