@@ -534,6 +534,11 @@ Base.getindex(g::Game, i...) = g.board[i...]
 Base.setindex!(g::Game, x, i...) = Base.setindex!(g.board, x, i...)
 Base.lastindex(g::Game) = Base.lastindex(g.board)
 
+"""
+    plot(g::Game)
+
+Plot game's configuration.
+"""
 function plot(g::Game)
     c = Configuration(g.board, g.newtile, g.move, g.depth, g.score)
     plot(c)
@@ -573,7 +578,7 @@ setcareful(initd::Int, maxd::Int, cornersize::Int) =
 setcareful() = setcareful(4, 7, 4)
 
 """
-    computedepth(b::Board)
+    computedepth(g::Game)
 
 Compute recursive evaluation's depth, using parameter
 `careful` = `(initd, maxd, cornersize)`
