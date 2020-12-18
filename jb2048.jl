@@ -59,6 +59,8 @@
     Duplication de code inévitable avec `struct Game`, pour conserver
     dans les deux cas un accès direct aux champs `board`, `move`, etc.
     * 30 novembre, la fonction `plot` utilise la structure `Configuration`.
+    * 2 décembre, la fonction `force(g, dir)` incrémente `g.move`
+    et enregistre la nouvelle configuration dans l'historique.
 """
 
 module jb2048
@@ -255,7 +257,9 @@ end
 # setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 0; 8 3 0 0; 6 0 0 0])
 # setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
-setgamma() = setgamma([16 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
+# setgamma() = setgamma([16 12 8 4; 12 10 2 0; 8 2 0 0; 4 0 0 0])
+# setgamma() = setgamma([16 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
+setgamma() = setgamma([16 12 8 4; 12 6 2 0; 8 2 0 0; 4 0 0 0])
 
 struct Estimation
     val::Int
@@ -723,7 +727,7 @@ end
 """
     force!(g::Game, dir::Int)
 
-Force a move in the required direction (without updating history),
+Force a move in the required direction,
 and plot the result:
 
     force!(g,3) # force a move up
@@ -733,12 +737,14 @@ function force!(g::Game, dir::Int)
     moved || error("Illegal direction")
     g.board = b
     g.newtile = tileinsert!(b)
+    g.move += 1
     plot(g)
-    score
+    record(g)
+    return
 end
 
 """
-    xplay!(g::Game, n::Int; options...)
+    xplay!(g::Game, n::Int [, display = true])
 
 Sequence of plays, alternating quick progressions and
 careful ones. The sequence stops as soon as
@@ -746,18 +752,23 @@ the tile `14` (i.e. `2^14=16384`) -- resp. `13, 12` --
 appears in position `n`.
 If `n>3`, `xplay! = play!`.
 
-Optional keywords are those of the `play!` function.
+Optional keyword argument `display` (default `false`),
+as in the function `play()`.
 """
-function xplay!(g::Game, n::Int; options...)
-    n > 3 && return play!(g; options...)
+function xplay!(g::Game, n::Int; display::Bool=false)
+    d = display
     for p in n:4
         setcareful(3, 7, 3)
-        println("quick play")
-        play!(g, target = (9, 4); options...)
+        println("quick play, careful = $careful")
+        play!(g, target = (9, 4), display = d)
         setcareful(5, 8, 4)
-        t = p < 4 ? (14 - p, p) : (15 - n, n)
-        println("target $t")
-        play!(g, target = t; options...)
+        if n < 4
+            t = p < 4 ? (14 - p, p) : (15 - n, n)
+        else
+            t = (15, 1)
+        end
+        println("target $t, careful = $careful")
+        play!(g, target = t, display = d)
     end
 end
 
