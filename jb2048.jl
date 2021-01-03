@@ -61,6 +61,8 @@
     * 30 novembre, la fonction `plot` utilise la structure `Configuration`.
     * 2 décembre, la fonction `force(g, dir)` incrémente `g.move`
     et enregistre la nouvelle configuration dans l'historique.
+    * 24 décembre 2020, fonction `staticeval()` modifiée pour tenter de
+    prévenir les glissements intempestifs qui décollent du bord une grande tuile.
 """
 
 module jb2048
@@ -253,13 +255,10 @@ function setgamma(weights::Matrix{Int})
     global gamma = weights
 end
 
-# setgamma() = setgamma([16 12 8 4; 12 10 5 2; 8 5 3 1; 4 2 1 0.5])
-# setgamma() = setgamma([16 12 8 4; 12 6 3 2; 8 3 1 0.5; 4 2 0.5 0.5])
-# setgamma() = setgamma([16.0 12 8 6; 12 10 3 0; 8 3 0 0; 6 0 0 0])
-# setgamma() = setgamma([16.0 12 8 6; 12 10 3 2; 8 3 1 0; 6 2 0 0])
 # setgamma() = setgamma([16 12 8 4; 12 10 2 0; 8 2 0 0; 4 0 0 0])
 # setgamma() = setgamma([16 12 8 0; 12 10 6 0; 8 6 4 0; 0 0 0 0])
-setgamma() = setgamma([16 12 8 4; 12 6 2 0; 8 2 0 0; 4 0 0 0])
+setgamma() = setgamma([16 12 8 4; 12 10 6 0; 8 6 0 0; 4 0 0 0])
+# setgamma() = setgamma([16 12 8 4; 12 4 2 0; 8 2 0 0; 4 0 0 0])
 
 struct Estimation
     val::Int
@@ -269,7 +268,7 @@ end
 # simpler word than worse_estim :-)
 const sadestim = Estimation(0, -1)
 
-function Base.:<(e1::Estimation, e2::Estimation)
+function Base.isless(e1::Estimation, e2::Estimation)
     e2.score < 0 && return false
     e1.score < 0 && return true
     # sw = score's weight
@@ -318,8 +317,13 @@ function staticeval(b::Board)
         for j in 2:n
             @inbounds y = b[i, j]
             if y > 0
-                x == y && (score += 2<<y)
-                0 < x < y && (val += sq * (1<<x - 1<<y))
+                if x == y
+                    score += 2<<y
+                elseif x == 0
+                    j == 2 && (val -= sq * (1<<y))
+                elseif x < y
+                    val += sq * (1<<x - 1<<y)
+                end
             end
             x = y
         end
@@ -331,8 +335,13 @@ function staticeval(b::Board)
         for i in 2:m
             @inbounds y = b[i, j]
             if y > 0
-                x == y && (score += 2<<y)
-                0 < x < y && (val += sq * (1<<x - 1<<y))
+                if x == y
+                    score += 2<<y
+                elseif x == 0
+                    i == 2 && (val -= sq * (1<<y))
+                elseif x < y
+                    val += sq * (1<<x - 1<<y)
+                end
             end
             x = y
         end
@@ -358,9 +367,7 @@ function maxeval(b::Board, depth::Int)
         if moved
             bs[1] == 0 && continue
             e = meaneval(bs, depth - 1)
-            val = e.val
-            score = e.score + sc
-            e = Estimation(val, score)
+            e = Estimation(e.val, e.score + sc)
             bestestim < e && (bestestim = e)
         end
     end
@@ -372,7 +379,7 @@ meancache = Dict{UInt64, Estimation}()
 hits_meancache = misses_meancache = 0
 
 # fz = free zone
-const nfz, dfz = 3, 5
+# const nfz, dfz = 3, 5
 
 """
     meaneval(b::Board, depth::Int)
@@ -404,7 +411,8 @@ function meaneval(b::Board, depth::Int)
     fc = findall(b .== 0)  # indices of free cells
     nf = length(fc)
     nf == 0 && return sadestim
-    nf > nfz && depth > dfz && (depth -= 1)
+    # accélération apparemment sensible -- 10% ?
+    nf > 3 && depth > 5 && (depth -= 1)
     val::Float64 = 0.0
     score::Float64 = 0.0
     for i in fc
@@ -619,8 +627,6 @@ function move!(g::Game, depth::Int)
         empty!(meancache)
     end
     b = g.board
-    # updateworse(b)
-    ### compute best move
     bestestim = sadestim
     bestdir = 0
     local newboard::Board
@@ -776,19 +782,23 @@ end
     evals(b::Board, depth)
 
 Return a matrix `u`, where `u[i,j]` is the evaluation of move `i`
-(i.e. in the direction `i`) up to depth `j`.
+(i.e. in the direction `i`) up to depth `j-1` --
+thus first column gives static evaluations.
 """
 function evals(b::Board, depth::Int)
     empty!(staticache)
     empty!(meancache)
     u = Matrix{Estimation}(undef, 4, depth)
     for dir = 1:4
-        bs, score, moved = slide(b, dir)
-        if moved
-            for k = 1:depth
-                e = meaneval(bs, k)
-                u[dir, k] = e
+        bs, sc, moved = slide(b, dir)
+        for k = 1:depth
+            if moved
+                e = meaneval(bs, k - 1)
+                e = Estimation(e.val, e.score + sc)
+            else
+                e = sadestim
             end
+            u[dir, k] = e
         end
     end
     u
@@ -819,7 +829,7 @@ function repartition(n; game = nothing, verbose = true, target = (16, 1))
     println("gamma = $gamma")
     print("careful = $careful ")
     println("sq, sw = $sq, $sw")
-    println("meaneval nfz, dfz = $nfz, $dfz")
+    # println("meaneval nfz, dfz = $nfz, $dfz")
     hsup = zeros(Int, 16)
     nmoves = 0
     hgames = Vector{Game}(undef, n)
@@ -876,10 +886,10 @@ function score_to_moves(b::Board, s::Integer)
 end
 
 """
-    freeze(b::Board, d::Int)
+    freeze(b::Board, m::Int)
 
 Experimental. Return the vector of cartesian coordinates of cells that may be frozen.
-Argument `d` is the minimal value of frozen tiles;
+Argument `m` is the minimal value of frozen tiles;
 it is incremented until all frozen tiles are distinct.
 Finally return the coordinates of the largest included *partition*.
 
@@ -913,21 +923,21 @@ julia> freeze([3 5 2; 1 4 2], 4)
 0-element Array{CartesianIndex{2},1}
 ```
 """
-function freeze(b::Board, d::Int)
-    ifrozen = findall(b .>= d)
+function freeze(b::Board, m::Int)
+    ifrozen = findall(b .>= m)
     n = length(ifrozen)
     if n > 1
         u = sort(b[ifrozen], rev = true)
         for i in 1 : n - 1
             # @inbounds useless (test btime)
             if u[i] == u[i + 1]
-                d = u[i] + 1
-                ifrozen = findall(b .>= d)
+                m = u[i] + 1
+                ifrozen = findall(b .>= m)
                 break
             end
         end
     end
-    # ifree = findall(b .< d)
+    # ifree = findall(b .< m)
     n = length(ifrozen)
     n == 0 && return ifrozen
     ifrozen[1] != CartesianIndex(1, 1) && return CartesianIndex{2}[]
