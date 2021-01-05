@@ -63,6 +63,9 @@
     et enregistre la nouvelle configuration dans l'historique.
     * 24 décembre 2020, fonction `staticeval()` modifiée pour tenter de
     prévenir les glissements intempestifs qui décollent du bord une grande tuile.
+    * 5 janvier 2021, `move!` traite correctement les mouvements qui déplacent
+    la tuile supérieure gauche ("bad moves"); ceux-ci sont pris en compte,
+    mais seulement si nécessaire.
 """
 
 module jb2048
@@ -74,7 +77,7 @@ const plt = PyPlot
 # export Board, Game, History, plot, record, slide, tileinsert!, back!
 export Game, Configuration, plot, initgame, initplot,
     play!, back!, force!, xplay!, repartition,
-    setcareful, setgamma
+    setcareful, setgamma, evals
 
 # Plateau de jeu
 const Board = Matrix{Int}
@@ -629,24 +632,32 @@ function move!(g::Game, depth::Int)
     b = g.board
     bestestim = sadestim
     bestdir = 0
+    ds = [2, 4, 1, 3]   # directions, order matters
+    n = 0
     local newboard::Board
-    for dir = 1:4
+    while length(ds) > 0
+        dir = popfirst!(ds)
+        n += 1
         bs, sc, moved = slide(b, dir)
         if moved
-            d = depth
-            bs[1] == 0 && (d = 1)
-            e = meaneval(bs, d)
-            val = e.val
-            score = e.score + sc
-            e = Estimation(val, score)
+            # bs[1] == 0 -> bad move
+            if bs[1] == 0 && n <= 4
+                push!(ds, dir)  # see later, if necessary
+                continue
+            end
+            # bs[1] == 0 && println("Trying bad move $b n=$n dir=$dir ds=$ds")
+            e = meaneval(bs, depth)
+            e = Estimation(e.val, e.score + sc)
             if bestestim < e
                 bestestim = e
                 bestdir = dir
                 # newboard = copy(bs)
                 newboard = bs
-                g.score = score
+                g.score = e.score
             end
         end
+        # needless looking at bad moves
+        n == 4 && bestdir > 0 && break
     end
     if bestdir > 0
         # g.board = copy(newboard)
