@@ -66,6 +66,7 @@
     * 5 janvier 2021, `move!` traite correctement les mouvements qui déplacent
     la tuile supérieure gauche ("bad moves"); ceux-ci sont pris en compte,
     mais seulement si nécessaire.
+    * 20 février, `play!` retourne un booléen. Abandon d'Atom pour VS code.
 """
 
 module jb2048
@@ -323,7 +324,7 @@ function staticeval(b::Board)
                 if x == y
                     score += 2<<y
                 elseif x == 0
-                    j == 2 && (val -= sq * (1<<y))
+                    j == 2 && (val -= sq * (2<<y))
                 elseif x < y
                     val += sq * (1<<x - 1<<y)
                 end
@@ -341,7 +342,7 @@ function staticeval(b::Board)
                 if x == y
                     score += 2<<y
                 elseif x == 0
-                    i == 2 && (val -= sq * (1<<y))
+                    i == 2 && (val -= sq * (2<<y))
                 elseif x < y
                     val += sq * (1<<x - 1<<y)
                 end
@@ -590,7 +591,7 @@ end
 setcareful(initd::Int, maxd::Int, cornersize::Int) =
     setcareful((initd, maxd, cornersize))
 
-setcareful() = setcareful(4, 7, 4)
+setcareful() = setcareful(5, 6, 4)
 
 """
     computedepth(g::Game)
@@ -632,7 +633,8 @@ function move!(g::Game, depth::Int)
     b = g.board
     bestestim = sadestim
     bestdir = 0
-    ds = [2, 4, 1, 3]   # directions, order matters
+    # directions, order matters, last dir must be "safe"
+    ds = [2, 4, 1, 3]
     n = 0
     local newboard::Board
     while length(ds) > 0
@@ -681,25 +683,22 @@ Play a game, with current state of `g` as starting point.
   * Optional keyword argument `target` is a couple `(t,p)`
     that stops the game as soon as the tile `t` appears
     in position `p`.
+
+Return `true` if the number of moves or the target are reached,
+`false` if the game stops for lack of valid move.
 """
 function play!(g::Game;
-    display::Bool=false, moves::Int=32768, target::Tuple{Int,Int}=(16,1))
+    display::Bool=false, moves::Int=100_000, target::Tuple{Int,Int}=(16,1))
     global hits_meancache, misses_meancache
     global hits_staticeval, misses_staticeval
     n = g.move
-    # if n < 2
-    #     hits_meancache = misses_meancache = 0
-    #     hits_staticeval = misses_staticeval = 0
-    #     g.hist = History(128)
-    #     record(g.hist, g.board, CartesianIndex(1,1), 0, 0)
-    # end
     t, p = target   # target value, position
     while g.move < n + moves
         if t < 16   # otherwise target unreachable
             large = count(g.board .>= t)
             if large >= p
                 large = count(g.board .> t)
-                large >= p - 1 && break
+                large >= p - 1 && return true
             end
         end
         d = computedepth(g)
@@ -711,13 +710,13 @@ function play!(g::Game;
             end
             g.depth = d
         end
-        move!(g, d) > 0 || break
+        move!(g, d) > 0 || return false
         g.newtile = tileinsert!(g.board)
         display && plot(g)
         record(g)
     end
     display && plot(g)
-    return
+    return true
 end
 
 """
@@ -767,7 +766,7 @@ Sequence of plays, alternating quick progressions and
 careful ones. The sequence stops as soon as
 the tile `14` (i.e. `2^14=16384`) -- resp. `13, 12` --
 appears in position `n`.
-If `n>3`, `xplay! = play!`.
+If `n=4`, the target is the tile `15`.
 
 Optional keyword argument `display` (default `false`),
 as in the function `play()`.
@@ -775,18 +774,19 @@ as in the function `play()`.
 function xplay!(g::Game, n::Int; display::Bool=false)
     d = display
     for p in n:4
-        setcareful(3, 7, 3)
+        setcareful(3, 6, 3)
         println("quick play, careful = $careful")
-        play!(g, target = (9, 4), display = d)
-        setcareful(5, 8, 4)
+        play!(g, target = (9, 4), display = d) || return false
+        setcareful(5, 6, 4)
         if n < 4
             t = p < 4 ? (14 - p, p) : (15 - n, n)
         else
             t = (15, 1)
         end
         println("target $t, careful = $careful")
-        play!(g, target = t, display = d)
+        play!(g, target = t, display = d) || return false
     end
+    return true
 end
 
 """
@@ -846,7 +846,7 @@ function repartition(n; game = nothing, verbose = true, target = (16, 1))
     hgames = Vector{Game}(undef, n)
     local hmoves
     for i = 1 : n
-        g = (game == nothing) ? initgame() : deepcopy(game)
+        g = (game === nothing) ? initgame() : deepcopy(game)
         play!(g, target = target)
         nmoves += g.move
         sup = maximum(g.board)
