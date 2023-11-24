@@ -1,5 +1,5 @@
 # 2048
-2048 Game
+
 This module allows playing (automatically) the 2048 game, using Julia; it requires the package PyPlot, and is stored in the file jb2048.jl.
 Using the REPL, a typical session looks like the following :
 
